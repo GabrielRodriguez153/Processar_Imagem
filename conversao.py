@@ -3,6 +3,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras.preprocessing import image
 import io
+import asyncio
 
 app = Flask(__name__)
 
@@ -27,7 +28,7 @@ def analisar_planta(img_bytes, classes={0: "Planta saudável", 1: "Planta doente
     return classes[indice]
 
 @app.route('/predict', methods=['POST'])
-def predict():
+async def predict():
     if 'file' not in request.files:
         return jsonify({'error': 'Nenhuma imagem fornecida'}), 400
     
@@ -36,11 +37,21 @@ def predict():
         return jsonify({'error': 'Nenhuma imagem selecionada'}), 400
 
     try:
+        # Processamento assíncrono
         img_bytes = file.read()
-        resultado = analisar_planta(img_bytes)
+        
+        # Executar em thread separada para não bloquear
+        loop = asyncio.get_event_loop()
+        resultado = await loop.run_in_executor(None, analisar_planta, img_bytes)
+        
         return jsonify({'status': 'sucesso', 'resultado': resultado})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({'status': 'online', 'message': 'API está funcionando'})
+
 if __name__ == '__main__':
+    # Para desenvolvimento apenas
     app.run(host='0.0.0.0', port=5000, debug=False)
